@@ -1,0 +1,68 @@
+//todo 重写二进制协议解析,判断数据包类型
+
+package cchelper
+
+import "encoding/binary"
+
+// #Enum
+type PacType uint32
+
+// 在此添加新协议类型
+const (
+	Pac_Type_Unknown   PacType = 0
+	Pac_Type_HeartBeat PacType = 1
+	Pac_Type_Protobuf  PacType = 2
+)
+
+// #protocol length const
+const (
+	Pac_Len_Head = 8 // 消息头长度 = Pac_Len_Data + Pac_Len_Type
+	Pac_Len_Data = 4 // [消息头]存储消息体数据长度字段的长度
+	Pac_Len_Type = 4 // [消息头]存储消息体类型字段的长度
+)
+
+// #protocol struct
+// packet protocol : length of pbody(4byte) + ptype(4byte) + pbody
+// pakcet = Head + Body
+// Body = ptype + pdata
+// Packet means packet body
+type Packet struct {
+	ptype PacType
+	pdata []byte
+}
+
+// # general method
+func pack(p *Packet) []byte {
+	buf := make([]byte, Pac_Len_Head+len(p.pdata))
+	binary.BigEndian.PutUint32(buf[:Pac_Len_Data], uint32(len(p.pdata)))
+	binary.BigEndian.PutUint32(buf[Pac_Len_Data:Pac_Len_Head], uint32(p.ptype))
+	copy(buf[Pac_Len_Head:], p.pdata)
+	return buf
+}
+
+// 返回被截断的字节数组
+func unpack(buffer []byte, ch chan *Packet) []byte {
+	bufLen := len(buffer)
+	var nilBf []byte
+	if bufLen < Pac_Len_Head { // 包长度不足,等待read
+		return buffer
+	}
+
+	pdataLen := int(binary.BigEndian.Uint32(buffer[:Pac_Len_Data])) // 消息体长度
+	bufLeftLen := bufLen - Pac_Len_Head
+
+	switch {
+	case pdataLen > bufLeftLen: // 包长度不足,等待read
+		return buffer
+	case pdataLen == bufLeftLen: // 等待read
+		ptype := PacType(binary.BigEndian.Uint32(buffer[Pac_Len_Data:Pac_Len_Head])) // 消息类型
+		ch <- &Packet{ptype: ptype, pdata: buffer[Pac_Len_Head:]}
+		return nilBf
+	case pdataLen < bufLeftLen: // 粘包-分包
+		ptype := PacType(binary.BigEndian.Uint32(buffer[Pac_Len_Data:Pac_Len_Head]))     // 消息类型
+		ch <- &Packet{ptype: ptype, pdata: buffer[Pac_Len_Head : Pac_Len_Head+pdataLen]} // stop here!!!!
+		return unpack(buffer[Pac_Len_Head+pdataLen:], ch)                                // 递归效率会不会有问题呢?
+	}
+
+	return nilBf
+}
