@@ -1,0 +1,103 @@
+package tcp
+
+import (
+	"encoding/binary"
+	"lib/glog"
+	"lib/link"
+	"lib/proto"
+	"lib/util/limit"
+	"net"
+	"time"
+	"xf/module"
+)
+
+type TcpModule struct {
+	server       *link.Server
+	protocol     link.PacketProtocol
+	readBuffer   int
+	readOverTime time.Duration
+	tcpMaxConn   uint64
+	channels     map[uint64]*link.Channel
+}
+
+func init() {
+	module.Tcp = &TcpModule{
+		channels: make(map[uint64]*link.Channel),
+	}
+}
+
+func (self *TcpModule) InitChannel() {
+
+}
+
+func (self *TcpModule) Start(listener net.Listener) {
+	glog.Infof("TCP: listening on %s", listener.Addr())
+
+	self.readOverTime = time.Duration(int64(time.Second) * int64(module.Opt.ReadTOver()))
+	self.tcpMaxConn = module.Opt.MaxConn()
+	self.readBuffer = module.Opt.ReadBuffer()
+
+	sem := limit.NewMaxBlockCtrl(self.tcpMaxConn)
+
+	// todo packet head 写入配置文件
+	self.protocol = link.PacketN(4, binary.BigEndian)
+	self.server = link.NewServer(listener, self.protocol)
+	self.server.SetReadBufferSize(self.readBuffer)
+	self.channels[0] = link.NewChannel(self.server.Protocol()) // 0 global channel
+
+	defer func() {
+		if err := recover(); err != nil {
+			glog.Fatalf("TCP: server panic(%s)", err)
+			if !self.server.IsStopped() {
+				self.server.Stop(err)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			msg := module.Msg.GenKeepaliveResp(0)
+			bymsg, err := proto.Marshal(msg)
+			if err != nil {
+				glog.Errorf("msgHandler: proto.Marshal err [%s]", err.Error())
+				continue
+			}
+			self.channels[0].Broadcast(link.Binary(bymsg))
+		}
+	}()
+
+	for {
+		sem.Pop()
+
+		session, err := self.server.Accept()
+		// session 在关闭之后等于nil
+		if session != nil {
+			glog.V(3).Infof("TCP: client %s in", session.Conn().RemoteAddr().String())
+		}
+		if err != nil {
+			glog.Errorf("TCP: server accept err [%s]", err.Error())
+			self.server.Stop(err)
+			break
+		}
+
+		module.Sta.Online() // 上线:人数统计
+
+		go func() {
+			defer func() {
+				sem.Push()
+				module.Sta.Offline() // 离线:人数统计
+				glog.V(3).Infof("TCP: client %s close", session.Conn().RemoteAddr().String())
+			}()
+
+			self.channels[0].Join(session, nil) // no kickback
+			self.sessionHanlder(session)
+		}()
+	}
+
+	glog.Infof("TCP: closing %s", listener.Addr())
+}
+
+func (self *TcpModule) Stop(reasion interface{}) {
+	self.server.Stop(reasion)
+}

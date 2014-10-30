@@ -15,7 +15,6 @@ type HttpServer interface {
 type TcpServer interface {
 	Start(listener net.Listener)
 	Stop(interface{})
-	Protocol() link.PacketProtocol
 }
 
 type MsgHandler interface {
@@ -23,7 +22,10 @@ type MsgHandler interface {
 	// A: map[uint64][*Message.Message] key:SentToSid value:SendMsg
 	// B: []interface{} 两个一组,基数表示key,偶数表示value 使用时候转型
 	// benchmark 表明 性能 A>B
-	Handle(*Message.Message, uint64, chan *map[uint64]*Message.Message)
+	//Handle(*Message.Message, *link.Session, chan *map[uint64]*Message.Message)
+	Handle(*Message.Message, *link.Session, chan *[]*MsgPack)
+
+	GenKeepaliveResp(uint32) *Message.Message
 }
 
 type Optioner interface {
@@ -41,18 +43,18 @@ type Optioner interface {
 }
 
 type StatisHandler interface {
-	Onlines() int64
-	Helps() int
+	Onlines() int64 // 查询在线人数
+	Helps() int     // 查询帮助len(map)
 	Publics() int
-	HelpSid(sid uint64) uint64
+	HelpSid(sid uint64) uint64 //查询特定siphelp统计
 	PublicSid(sid uint64) uint64
 
 	Lock()
 	Unlock()
 	Online()
 	Offline()
-	Help(sid uint64)
-	Public(sid uint64)
+	Help(session *link.Session)
+	Public(session *link.Session)
 }
 
 type Architecture interface {
@@ -75,12 +77,6 @@ type Architecture interface {
 	//ChanDel()
 }
 
-type Channeler interface {
-	//Join(string) // 递归加入
-	//Exit(string) // 递归移出来
-	//Broadcast(string) //
-}
-
 var (
 	Opt  Optioner
 	Tcp  TcpServer
@@ -88,5 +84,4 @@ var (
 	Msg  MsgHandler
 	Sta  StatisHandler
 	Arch Architecture
-	Ch   Channeler
 )

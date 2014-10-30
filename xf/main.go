@@ -1,8 +1,15 @@
-// 添加channel支持
-// 添加统计
+// X添加channel支持
+// X添加统计
+// 目前的消息接口不适合广播....
 // SendQueue
-// Todo: sessionHandler 与 msgHandler 合并
+// BUG: 断线重连之后,读超时失败
+// 广播时候 seq 填写最大值或者最小值,或者在客户端规定广播seq不处理
 
+// todo: 手动做一下内联...将tcp模块三个文件合并
+// todo: 使用server.Send来处理全部发送部分,舍弃session.Send()
+// todo: msgmodule与tcpmodule合并//用新版合并
+// todo: 是否需要统一处理发送
+// todo: packet head 写入配置文件
 package main
 
 import (
@@ -20,7 +27,6 @@ import (
 
 import (
 	_ "xf/module/arch"
-	_ "xf/module/ch"
 	_ "xf/module/http"
 	_ "xf/module/msg"
 	_ "xf/module/opt"
@@ -36,33 +42,33 @@ func main() {
 	glog.Info("xf server start")
 	glog.Info(module.Opt.String())
 
-	arches, err := module.Arch.ArchFetchAll()
-	fatalErrCheck(err)
-	for id, row := range arches {
-		fmt.Printf("[%d] {id:%d|pid:%d|depth:%d|order:%d|path:%s|name:%s}\n",
-			id.Int64,
-			row.Id.Int64,
-			row.Pid.Int64,
-			row.Depth.Int64,
-			row.Order.Int64,
-			row.Path.String,
-			row.Name.String,
-		)
-	}
+	//arches, err := module.Arch.ArchFetchAll()
+	//fatalErrCheck(err)
+	//for id, row := range arches {
+	//	fmt.Printf("[%d] {id:%d|pid:%d|depth:%d|order:%d|path:%s|name:%s}\n",
+	//		id.Int64,
+	//		row.Id.Int64,
+	//		row.Pid.Int64,
+	//		row.Depth.Int64,
+	//		row.Order.Int64,
+	//		row.Path.String,
+	//		row.Name.String,
+	//	)
+	//}
 
-	users, err := module.Arch.ArchFetchUser()
-	fatalErrCheck(err)
-	for user, row := range users {
-		fmt.Printf("[%s] {id:%d|archid:%d|erp:%s|user:%s|name:%s|identity:%s}\n",
-			user.String,
-			row.Id.Int64,
-			row.ArchId.Int64,
-			row.Erp.String,
-			row.User.String,
-			row.Name.String,
-			row.Identity.String,
-		)
-	}
+	//users, err := module.Arch.ArchFetchUser()
+	//fatalErrCheck(err)
+	//for user, row := range users {
+	//	fmt.Printf("[%s] {id:%d|archid:%d|erp:%s|user:%s|name:%s|identity:%s}\n",
+	//		user.String,
+	//		row.Id.Int64,
+	//		row.ArchId.Int64,
+	//		row.Erp.String,
+	//		row.User.String,
+	//		row.Name.String,
+	//		row.Identity.String,
+	//	)
+	//}
 
 	// start listen tcp
 	wg.AsynRun(func() {
@@ -92,6 +98,9 @@ func main() {
 		case "r": //report
 			report()
 		case "h":
+			if len(cmds) < 2 {
+				continue
+			}
 			sid, err := strconv.ParseUint(cmds[1], 10, 64)
 			if err != nil {
 				fmt.Println(err)

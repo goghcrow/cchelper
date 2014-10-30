@@ -2,7 +2,9 @@ package msg
 
 import (
 	"lib/Message"
+	"lib/link"
 	"lib/proto"
+	"xf/module"
 )
 
 var (
@@ -17,14 +19,17 @@ var mapReq2Res map[Message.MsgType]Message.MsgType = map[Message.MsgType]Message
 	Message.MsgType_UserManage_Request: Message.MsgType_UserManage_Response,
 }
 
-var errResponse = func(msg *Message.Message, errMsg string, sid uint64) *map[uint64]*Message.Message {
-	return &map[uint64]*Message.Message{
-		sid: &Message.Message{
-			Type:     mapReq2Res[msg.GetType()].Enum(),
-			Sequence: proto.Uint32(msg.GetSequence()),
-			Response: &Message.Response{
-				Result:           proto.Bool(false),
-				ErrorDescription: []byte(errMsg),
+var errResponse = func(msg *Message.Message, errMsg string, session *link.Session) *[]*module.MsgPack {
+	return &[]*module.MsgPack{
+		&module.MsgPack{
+			Sid: session.Id(),
+			Msg: &Message.Message{
+				Type:     mapReq2Res[msg.GetType()].Enum(),
+				Sequence: proto.Uint32(msg.GetSequence()),
+				Response: &Message.Response{
+					Result:           proto.Bool(false),
+					ErrorDescription: []byte(errMsg),
+				},
 			},
 		},
 	}

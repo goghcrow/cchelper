@@ -1,6 +1,15 @@
 package module
 
-import "database/sql"
+import (
+	"database/sql"
+	"lib/Message"
+)
+
+// tcpmodule 与 msgmodule 交换数据
+type MsgPack struct {
+	Sid uint64
+	Msg *Message.Message
+}
 
 type ArchRow struct {
 	Id    sql.NullInt64

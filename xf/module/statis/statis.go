@@ -1,6 +1,7 @@
 package statis
 
 import (
+	"lib/link"
 	"sync"
 	"sync/atomic"
 	"xf/module"
@@ -41,7 +42,8 @@ func (self *StatisModule) Lock()    { self.rw.Lock() }
 func (self *StatisModule) Unlock()  { self.rw.Unlock() }
 func (self *StatisModule) Online()  { atomic.AddInt64(&self.OnlineCount, 1) }
 func (self *StatisModule) Offline() { atomic.AddInt64(&self.OnlineCount, -1) }
-func (self *StatisModule) Help(sid uint64) {
+func (self *StatisModule) Help(session *link.Session) {
+	sid := session.Id()
 	self.rw.Lock()
 	var pInt64 *uint64
 	pInt64, ok := self.HelpCount[sid]
@@ -53,7 +55,8 @@ func (self *StatisModule) Help(sid uint64) {
 	atomic.AddUint64(pInt64, 1)
 	self.rw.Unlock()
 }
-func (self *StatisModule) Public(sid uint64) {
+func (self *StatisModule) Public(session *link.Session) {
+	sid := session.Id()
 	self.rw.Lock()
 	var pInt64 *uint64
 	pInt64, ok := self.PublicCount[sid]

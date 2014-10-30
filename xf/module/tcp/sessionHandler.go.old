@@ -25,8 +25,9 @@ func (self *TcpModule) sessionHanlder(session *link.Session) {
 
 		chRec := make(chan *link.Message)
 
-		go self.msgHandler(rawMsg, chRec, session.Id())
+		go self.msgHandle(rawMsg, chRec, session)
 
+		// 可以同时回复多条
 		for msg := range chRec {
 			//err = session.TrySend(msg, time.Second*2) // async
 			//if err != nil {

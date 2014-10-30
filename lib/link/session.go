@@ -209,7 +209,10 @@ func (session *Session) TrySend(message Message, timeout time.Duration) error {
 	if session.IsClosed() {
 		return SendToClosedError
 	}
-
+	//l := len(session.sendChan)
+	//if l > 0 {
+	//	fmt.Println("len ", l)
+	//}
 	if timeout == 0 {
 		select {
 		case session.sendChan <- message:
